@@ -1,6 +1,7 @@
 package server;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import server.contract.ReadMethods;
 import server.response.Heartbeat;
 
@@ -23,7 +24,7 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
     private final String DELIMITER = "\r\n\r\n";
     private final Client client;
     private final DateTimeFormatter dateTimeFormat = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-    private final Gson gson = new Gson();
+    private final Gson gson = new GsonBuilder().setLenient().create();
     private final Long heartbeatMessagePeriod = 5000L;
     private static Long millis = System.currentTimeMillis();
 
@@ -112,10 +113,11 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
             decoded = decodeMessage(data, len, offset);
         }
 
-        String message = new String(decoded, "UTF-8");
+        String message = new String(decoded, StandardCharsets.UTF_8);
 
         Heartbeat heartbeatResponse = gson.fromJson(message, Heartbeat.class);
         if(heartbeatResponse.getMessage().equals("pong")){
+            System.out.println("Client is alive...");
             millis = System.currentTimeMillis();
             return null;
         }
