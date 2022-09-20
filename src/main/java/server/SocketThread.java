@@ -168,6 +168,12 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
 
     private void closeConnection() throws IOException {
         //Close connection
+        for (Map.Entry<Long, Client> clientToRemove : super.clients.entrySet()) {
+            if(clientToRemove.getKey().equals(client.getId())) {
+                clients.remove(clientToRemove);
+                break;
+            }
+        }
         client.getIn().close();
         client.getOut().close();
         client.getClient().close();
