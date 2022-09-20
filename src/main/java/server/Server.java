@@ -10,7 +10,7 @@ public class Server {
 
   private ServerSocket socket;
   public boolean running = true;
-  protected final Map<Long, Client> clients = new HashMap<Long, Client>();
+  protected static Map<Long, Client> clients = new HashMap<Long, Client>();
   private static Long clientCount = 0L;
 
   public Server() {

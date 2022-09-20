@@ -15,7 +15,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Map;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,7 +29,9 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
     private final DateTimeFormatter dateTimeFormat = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
     private final Gson gson = new GsonBuilder().setLenient().create();
     private final Long heartbeatMessagePeriod = 5000L;
+    private final Long tolerance = 10000L;
     private static Long millis = System.currentTimeMillis();
+    private static Long lastHeartbeatMessageReceived = System.currentTimeMillis();
 
     public SocketThread(Client client) {
         super();
@@ -43,15 +48,25 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
                 byte[] message = readMessage(client);
                 if (message != null && message.length > 0) {
                     System.out.printf("(%d)[%s]-> %s%n", client.getId(), LocalDateTime.now().format(dateTimeFormat), new String(message, StandardCharsets.UTF_8));
-                    sendMessage(out, message);
+//                    sendMessage(out, message);
+                    sendMessageToOtherClients(client.getId(), message);
                 } else if(System.currentTimeMillis() - millis >= heartbeatMessagePeriod) {
                     sendBeat(out);
                     millis = System.currentTimeMillis();
+
+                    if(System.currentTimeMillis() - lastHeartbeatMessageReceived > tolerance) break;
                 }
                 out.flush();
             }
+            closeConnection();
         } catch (Exception ex) {
-            System.out.println(ex.getMessage());
+            Logger.getAnonymousLogger().log(Level.INFO, ex.getMessage());
+        }finally {
+            try {
+                closeConnection();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -74,20 +89,6 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
         byte[] empty = new byte[message.length];
         return Arrays.equals(message, empty);
     }
-
-//    @Override
-//    public void sendMessageToOtherClients(Long senderId, String message) {
-//        System.out.printf("Client with id: %d sent %s", senderId, message);
-//        clients.forEach((id, client) -> {
-//            if (!senderId.equals(id)) {
-//                OutputStream outStream = client.getOut();
-//                PrintWriter writer = new PrintWriter(outStream, true);
-//                String clearMessage = message.substring(0, message.indexOf("}") + 1);
-//                writer.println(clearMessage);
-//                writer.flush();
-//            }
-//        });
-//    }
 
     @Override
     public byte[] readMessage(Client client) throws IOException {
@@ -113,12 +114,11 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
             decoded = decodeMessage(data, len, offset);
         }
 
-        String message = new String(decoded, StandardCharsets.UTF_8);
-
+        String message = new String(decoded, StandardCharsets.UTF_8).trim();
         Heartbeat heartbeatResponse = gson.fromJson(message, Heartbeat.class);
-        if(heartbeatResponse.getMessage().equals("pong")){
+        if(heartbeatResponse.getType().equals("heartbeat") && heartbeatResponse.getMessage().equals("pong")){
             System.out.println("Client is alive...");
-            millis = System.currentTimeMillis();
+            lastHeartbeatMessageReceived = System.currentTimeMillis();
             return null;
         }
 
@@ -164,5 +164,24 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
         Heartbeat ping = new Heartbeat("ping");
         byte[] heartbeatMessage = gson.toJson(ping).getBytes(StandardCharsets.UTF_8);
         sendMessage(out, heartbeatMessage);
+    }
+
+    private void closeConnection() throws IOException {
+        //Close connection
+        client.getIn().close();
+        client.getOut().close();
+        client.getClient().close();
+        System.out.println("Client has disconnected...");
+    }
+
+    private void sendMessageToOtherClients(Long senderId, byte[] message) throws IOException {
+        //System.out.printf("Client with id: %d sent %s", senderId, new String(message, StandardCharsets.UTF_8).trim());
+        System.out.println(super.clients.keySet());
+        for (Map.Entry<Long, Client> client : super.clients.entrySet()) {
+            if(!client.getKey().equals(senderId)) {
+                sendMessage(client.getValue().getOut(), message);
+                System.out.printf("Sent to client: %d%n", client.getKey());
+            }
+        }
     }
 }
