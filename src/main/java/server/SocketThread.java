@@ -1,8 +1,11 @@
 package server;
 
+import com.google.gson.Gson;
 import server.contract.ReadMethods;
+import server.response.Heartbeat;
 
 import java.io.*;
+import java.net.Socket;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -20,6 +23,9 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
     private final String DELIMITER = "\r\n\r\n";
     private final Client client;
     private final DateTimeFormatter dateTimeFormat = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+    private final Gson gson = new Gson();
+    private final Long heartbeatMessagePeriod = 5000L;
+    private static Long millis = System.currentTimeMillis();
 
     public SocketThread(Client client) {
         super();
@@ -31,11 +37,15 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
         try {
             doHandshake();
             OutputStream out = client.getOut();
+            Socket c = client.getClient();
             while (true) {
                 byte[] message = readMessage(client);
                 if (message != null && message.length > 0) {
                     System.out.printf("(%d)[%s]-> %s%n", client.getId(), LocalDateTime.now().format(dateTimeFormat), new String(message, StandardCharsets.UTF_8));
                     sendMessage(out, message);
+                } else if(System.currentTimeMillis() - millis >= heartbeatMessagePeriod) {
+                    sendBeat(out);
+                    millis = System.currentTimeMillis();
                 }
                 out.flush();
             }
@@ -55,7 +65,6 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
         for (int i = 0; i < frame.length - offset; i++) {
             frame[offset + i] = message[i];
         }
-
         out.write(frame, 0, frame.length);
         out.flush();
     }
@@ -103,6 +112,13 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
             decoded = decodeMessage(data, len, offset);
         }
 
+        String message = new String(decoded, "UTF-8");
+
+        Heartbeat heartbeatResponse = gson.fromJson(message, Heartbeat.class);
+        if(heartbeatResponse.getMessage().equals("pong")){
+            millis = System.currentTimeMillis();
+            return null;
+        }
 
         return decoded;
     }
@@ -140,5 +156,11 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
         }
 
         return decoded;
+    }
+
+    private void sendBeat(OutputStream out) throws IOException {
+        Heartbeat ping = new Heartbeat("ping");
+        byte[] heartbeatMessage = gson.toJson(ping).getBytes(StandardCharsets.UTF_8);
+        sendMessage(out, heartbeatMessage);
     }
 }

@@ -6,7 +6,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 public class Client {
-    private Long id;
+    private final Long id;
     private final Socket client;
     private final OutputStream out;
     private final InputStream in;
@@ -30,7 +30,7 @@ public class Client {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public Socket getClient() {
+        return client;
     }
 }
