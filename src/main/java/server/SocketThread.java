@@ -29,7 +29,7 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
     private final DateTimeFormatter dateTimeFormat = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
     private final Gson gson = new GsonBuilder().setLenient().create();
     private final Long heartbeatMessagePeriod = 5000L;
-    private final Long tolerance = 10000L;
+    private final Long tolerance = 20000L;
     private static Long millis = System.currentTimeMillis();
     private static Long lastHeartbeatMessageReceived = System.currentTimeMillis();
 
@@ -168,15 +168,15 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
 
     private void closeConnection() throws IOException {
         //Close connection
+        client.getIn().close();
+        client.getOut().close();
+        client.getClient().close();
         for (Map.Entry<Long, Client> clientToRemove : super.clients.entrySet()) {
             if(clientToRemove.getKey().equals(client.getId())) {
                 clients.remove(clientToRemove);
                 break;
             }
         }
-        client.getIn().close();
-        client.getOut().close();
-        client.getClient().close();
         System.out.println("Client has disconnected...");
     }
 
