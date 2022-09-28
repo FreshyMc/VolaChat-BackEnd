@@ -50,18 +50,18 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
                     System.out.printf("(%d)[%s]-> %s%n", client.getId(), LocalDateTime.now().format(dateTimeFormat), new String(message, StandardCharsets.UTF_8));
 //                    sendMessage(out, message);
                     sendMessageToOtherClients(client.getId(), message);
-                } else if(System.currentTimeMillis() - millis >= heartbeatMessagePeriod) {
+                } else if (System.currentTimeMillis() - millis >= heartbeatMessagePeriod) {
                     sendBeat(out);
                     millis = System.currentTimeMillis();
 
-                    if(System.currentTimeMillis() - lastHeartbeatMessageReceived > tolerance) break;
+                    if (System.currentTimeMillis() - lastHeartbeatMessageReceived > tolerance) break;
                 }
                 out.flush();
             }
             closeConnection();
         } catch (Exception ex) {
             Logger.getAnonymousLogger().log(Level.INFO, ex.getMessage());
-        }finally {
+        } finally {
             try {
                 closeConnection();
             } catch (IOException e) {
@@ -116,7 +116,7 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
 
         String message = new String(decoded, StandardCharsets.UTF_8).trim();
         Heartbeat heartbeatResponse = gson.fromJson(message, Heartbeat.class);
-        if(heartbeatResponse.getType().equals("heartbeat") && heartbeatResponse.getMessage().equals("pong")){
+        if (heartbeatResponse.getType().equals("heartbeat") && heartbeatResponse.getMessage().equals("pong")) {
             System.out.println("Client is alive...");
             lastHeartbeatMessageReceived = System.currentTimeMillis();
             return null;
@@ -167,24 +167,26 @@ public class SocketThread extends Server implements Runnable, ReadMethods {
     }
 
     private void closeConnection() throws IOException {
-        //Close connection
-        client.getIn().close();
-        client.getOut().close();
-        client.getClient().close();
-        for (Map.Entry<Long, Client> clientToRemove : super.clients.entrySet()) {
-            if(clientToRemove.getKey().equals(client.getId())) {
-                clients.remove(clientToRemove);
-                break;
+        synchronized (this) {
+            //Close connection
+            client.getIn().close();
+            client.getOut().close();
+            client.getClient().close();
+            for (Map.Entry<Long, Client> clientToRemove : super.clients.entrySet()) {
+                if (clientToRemove.getKey().equals(client.getId())) {
+                    clients.remove(clientToRemove);
+                    break;
+                }
             }
+            System.out.println("Client has disconnected...");
         }
-        System.out.println("Client has disconnected...");
     }
 
     private void sendMessageToOtherClients(Long senderId, byte[] message) throws IOException {
         //System.out.printf("Client with id: %d sent %s", senderId, new String(message, StandardCharsets.UTF_8).trim());
         System.out.println(super.clients.keySet());
         for (Map.Entry<Long, Client> client : super.clients.entrySet()) {
-            if(!client.getKey().equals(senderId)) {
+            if (!client.getKey().equals(senderId)) {
                 sendMessage(client.getValue().getOut(), message);
                 System.out.printf("Sent to client: %d%n", client.getKey());
             }

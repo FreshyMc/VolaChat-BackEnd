@@ -14,10 +14,11 @@ public class Main extends Thread {
   public static void main(String[] args) throws InterruptedException, IOException {
     Main main = new Main();
     new Thread(main).start();
-
+    /*
     Thread.sleep(SERVER_RUNTIME);
 
     main.stopServer();
+     */
   }
 
   private void startServer() throws Exception {
